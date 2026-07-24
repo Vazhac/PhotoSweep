@@ -181,7 +181,13 @@ data class PhotoItem(
     val width: Int,
     val height: Int,
     val relativePath: String?,
+    val isVideo: Boolean = false,
 )
+
+object Premium {
+    @Volatile var unlocked: Boolean = false
+    fun isPremium() = unlocked
+}
 
 data class PhotoSweepUiState(
     val loading: Boolean = false,
@@ -200,6 +206,7 @@ data class PhotoSweepUiState(
     val smartScanSignature: String? = null,
     val lastActionLabel: String? = null,
     val deletedCount: Int = 0,
+    val isPremium: Boolean = false,
 )
 
 enum class SessionScreen {
@@ -210,15 +217,15 @@ enum class SessionScreen {
     Review,
 }
 
-enum class AutoCleanCategory(val label: String) {
-    Screenshots("Screenshots"),
-    LargeFiles("Large files"),
-    Duplicates("Duplicates"),
-    SimilarShots("Similar shots"),
-    LowQuality("Possible low-quality"),
-    Selfies("Selfies"),
-    Documents("Documents"),
-    Memes("Memes / text-heavy"),
+enum class AutoCleanCategory(val label: String, val requiresPremium: Boolean) {
+    Screenshots("Screenshots", false),
+    LargeFiles("Large files", false),
+    Duplicates("Duplicates", true),
+    SimilarShots("Similar shots", true),
+    LowQuality("Possible low-quality", true),
+    Selfies("Selfies", true),
+    Documents("Documents", true),
+    Memes("Memes / text-heavy", true),
 }
 
 data class AutoCleanBatch(
@@ -226,8 +233,11 @@ data class AutoCleanBatch(
     val title: String,
     val subtitle: String,
     val photos: List<PhotoItem>,
+    val allPhotos: List<PhotoItem> = photos,
     val bytes: Long,
     val groupCount: Int = 0,
+    val isLocked: Boolean = false,
+    val totalCount: Int = allPhotos.size,
 )
 
 data class SmartScanSummary(
@@ -480,6 +490,7 @@ class PhotoSweepViewModel(private val repository: PhotoSweepRepository) : ViewMo
             smartScanSummary = persistedState.smartScanSummary,
             smartScanSignature = persistedState.smartScanSignature,
             deletedCount = persistedState.deletedCount,
+            isPremium = Premium.isPremium(),
         )
     )
     val uiState: StateFlow<PhotoSweepUiState> = _uiState.asStateFlow()
@@ -491,8 +502,9 @@ class PhotoSweepViewModel(private val repository: PhotoSweepRepository) : ViewMo
     private var pendingDeletionBatch: List<PhotoItem> = emptyList()
 
     private fun commitState(state: PhotoSweepUiState) {
-        _uiState.value = state
-        repository.persistSessionState(state)
+        val syncedState = state.copy(isPremium = Premium.isPremium())
+        _uiState.value = syncedState
+        repository.persistSessionState(syncedState)
     }
 
     fun loadPhotos() {
@@ -537,6 +549,7 @@ class PhotoSweepViewModel(private val repository: PhotoSweepRepository) : ViewMo
                 smartScanSignature = if (canReuseSmartScan) currentSmartScanSignature else null,
                 lastActionLabel = previousState.lastActionLabel,
                 deletedCount = previousState.deletedCount,
+                isPremium = Premium.isPremium(),
             )
             commitState(normalizeState(refreshedState))
             swipeHistory.clear()
@@ -611,10 +624,19 @@ class PhotoSweepViewModel(private val repository: PhotoSweepRepository) : ViewMo
     }
 
     fun toggleAutoCleanCategory(category: AutoCleanCategory) {
+        if (category.requiresPremium && !_uiState.value.isPremium) return
         val current = _uiState.value.autoCleanSelection
         commitState(_uiState.value.copy(
             autoCleanSelection = if (category in current) current - category else current + category,
         ))
+    }
+
+    fun unlockPremium() {
+        Premium.unlocked = true
+        commitState(normalizeState(_uiState.value.copy(
+            autoCleanSelection = availableAutoCleanCategories(_uiState.value.copy(isPremium = true)),
+            lastActionLabel = "Premium unlocked",
+        )))
     }
 
     fun showAutoCleanReview() {
@@ -916,7 +938,9 @@ private fun PhotoItem.matches(filter: PhotoFilter, nowMillis: Long = System.curr
 }
 
 internal fun sessionPhotos(state: PhotoSweepUiState): List<PhotoItem> {
-    val availablePhotos = state.allPhotos.filter { photo -> photo.id !in state.protectedPhotoIds }
+    val availablePhotos = state.allPhotos.filter { photo ->
+        photo.id !in state.protectedPhotoIds && (state.isPremium || !photo.isVideo)
+    }
     return if (state.activeFilter == PhotoFilter.Duplicates) {
         duplicateGroups(availablePhotos).flatMap { it.photos }
     } else {
@@ -925,7 +949,9 @@ internal fun sessionPhotos(state: PhotoSweepUiState): List<PhotoItem> {
 }
 
 internal fun autoCleanBatches(state: PhotoSweepUiState): List<AutoCleanBatch> {
-    val availablePhotos = state.allPhotos.filter { photo -> photo.id !in state.protectedPhotoIds }
+    val availablePhotos = state.allPhotos.filter { photo ->
+        photo.id !in state.protectedPhotoIds && (state.isPremium || !photo.isVideo)
+    }
     val photoById = availablePhotos.associateBy { it.id }
     val screenshots = availablePhotos.filter { it.matches(PhotoFilter.Screenshots) }
     val largeFiles = availablePhotos
@@ -941,22 +967,44 @@ internal fun autoCleanBatches(state: PhotoSweepUiState): List<AutoCleanBatch> {
     val documentPhotos = state.smartScanSummary.documentIds.mapNotNull(photoById::get).distinctBy { it.id }
     val memePhotos = state.smartScanSummary.memeIds.mapNotNull(photoById::get).distinctBy { it.id }
 
+    fun batch(
+        category: AutoCleanCategory,
+        title: String,
+        subtitle: String,
+        photos: List<PhotoItem>,
+        bytes: Long,
+        groupCount: Int = 0,
+    ): AutoCleanBatch {
+        val isLocked = category.requiresPremium && !state.isPremium
+        return AutoCleanBatch(
+            category = category,
+            title = title,
+            subtitle = if (isLocked) "Premium · ${photos.size} found" else subtitle,
+            photos = if (isLocked) photos.take(4) else photos,
+            allPhotos = photos,
+            bytes = bytes,
+            groupCount = groupCount,
+            isLocked = isLocked,
+            totalCount = photos.size,
+        )
+    }
+
     return listOf(
-        AutoCleanBatch(
+        batch(
             category = AutoCleanCategory.Screenshots,
             title = "Screenshot cleanup",
             subtitle = "Fast win for clearing app captures and receipts.",
             photos = screenshots,
             bytes = screenshots.sumOf { it.sizeBytes },
         ),
-        AutoCleanBatch(
+        batch(
             category = AutoCleanCategory.LargeFiles,
             title = "Large photo cleanup",
             subtitle = "Targets photos above ${formatBytes(LargePhotoThresholdBytes)} first.",
             photos = largeFiles,
             bytes = largeFiles.sumOf { it.sizeBytes },
         ),
-        AutoCleanBatch(
+        batch(
             category = AutoCleanCategory.Duplicates,
             title = "Duplicate cleanup",
             subtitle = "Probable duplicates grouped by filename and image metadata.",
@@ -964,7 +1012,7 @@ internal fun autoCleanBatches(state: PhotoSweepUiState): List<AutoCleanBatch> {
             bytes = duplicatePhotos.sumOf { it.sizeBytes },
             groupCount = duplicateGroups.size,
         ),
-        AutoCleanBatch(
+        batch(
             category = AutoCleanCategory.SimilarShots,
             title = "Similar shot suggestions",
             subtitle = "Lower-confidence groups taken close together with matching dimensions.",
@@ -972,28 +1020,28 @@ internal fun autoCleanBatches(state: PhotoSweepUiState): List<AutoCleanBatch> {
             bytes = similarShotPhotos.sumOf { it.sizeBytes },
             groupCount = similarShotGroups.size,
         ),
-        AutoCleanBatch(
+        batch(
             category = AutoCleanCategory.LowQuality,
             title = "Possible low-quality photos",
             subtitle = "Lower-confidence suggestions based on very small resolution or file size.",
             photos = (lowQualityPhotos + smartLowQualityPhotos).distinctBy { it.id },
             bytes = (lowQualityPhotos + smartLowQualityPhotos).distinctBy { it.id }.sumOf { it.sizeBytes },
         ),
-        AutoCleanBatch(
+        batch(
             category = AutoCleanCategory.Selfies,
             title = "Selfie suggestions",
             subtitle = "Face-forward shots likely taken as selfies or close portraits.",
             photos = selfiePhotos,
             bytes = selfiePhotos.sumOf { it.sizeBytes },
         ),
-        AutoCleanBatch(
+        batch(
             category = AutoCleanCategory.Documents,
             title = "Document suggestions",
             subtitle = "Text-heavy photos that look more like documents than camera shots.",
             photos = documentPhotos,
             bytes = documentPhotos.sumOf { it.sizeBytes },
         ),
-        AutoCleanBatch(
+        batch(
             category = AutoCleanCategory.Memes,
             title = "Meme / text-heavy suggestions",
             subtitle = "Text-heavy images that are likely screenshots, memes, or social reposts.",
@@ -1004,18 +1052,18 @@ internal fun autoCleanBatches(state: PhotoSweepUiState): List<AutoCleanBatch> {
 }
 
 internal fun selectedAutoCleanBatches(state: PhotoSweepUiState): List<AutoCleanBatch> {
-    return autoCleanBatches(state).filter { it.category in state.autoCleanSelection && it.photos.isNotEmpty() }
+    return autoCleanBatches(state).filter { it.category in state.autoCleanSelection && !it.isLocked && it.allPhotos.isNotEmpty() }
 }
 
 internal fun selectedAutoCleanPhotos(state: PhotoSweepUiState): List<PhotoItem> {
     return selectedAutoCleanBatches(state)
-        .flatMap { it.photos }
+        .flatMap { it.allPhotos }
         .distinctBy { it.id }
 }
 
 internal fun availableAutoCleanCategories(state: PhotoSweepUiState): Set<AutoCleanCategory> {
     return autoCleanBatches(state)
-        .filter { it.photos.isNotEmpty() }
+        .filter { !it.isLocked && it.allPhotos.isNotEmpty() }
         .mapTo(mutableSetOf()) { it.category }
 }
 
@@ -1212,6 +1260,7 @@ fun PhotoSweepApp(
                     onContinue = viewModel::showAutoCleanReview,
                     onBack = viewModel::exitAutoClean,
                     onStartSmartScan = viewModel::startSmartScan,
+                    onUnlockClick = viewModel::unlockPremium,
                 )
                 uiState.screen == SessionScreen.AutoCleanReview -> AutoCleanReviewScreen(
                     modifier = Modifier.padding(padding),
@@ -1241,6 +1290,7 @@ fun PhotoSweepApp(
                     total = currentSessionPhotos.size,
                     markedCount = uiState.markedForDeletion.size,
                     reclaimableBytes = reclaimableBytes(uiState),
+                    isPremium = uiState.isPremium,
                     onKeep = viewModel::keepCurrent,
                     onDelete = viewModel::markDeleteCurrent,
                     onProtect = viewModel::protectCurrent,
@@ -1452,6 +1502,7 @@ fun AutoCleanSummaryScreen(
     onContinue: () -> Unit,
     onBack: () -> Unit,
     onStartSmartScan: () -> Unit,
+    onUnlockClick: () -> Unit,
 ) {
     Column(
         modifier = modifier
@@ -1491,49 +1542,12 @@ fun AutoCleanSummaryScreen(
         }
         batches.forEach { batch ->
             val selected = batch.category in selectedCategories
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .interactiveSurface()
-                    .animateContentSize(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(batch.title, style = MaterialTheme.typography.titleMedium)
-                        AssistChip(
-                            onClick = { onToggleCategory(batch.category) },
-                            label = { Text(if (selected) "Included" else "Excluded") },
-                        )
-                    }
-                    Text(batch.subtitle, style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "${batch.photos.size} items | ${formatBytes(batch.bytes)}" +
-                            if (batch.groupCount > 0) " | ${batch.groupCount} groups" else "",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    if (
-                        batch.category == AutoCleanCategory.SimilarShots ||
-                        batch.category == AutoCleanCategory.LowQuality ||
-                        batch.category == AutoCleanCategory.Selfies ||
-                        batch.category == AutoCleanCategory.Documents ||
-                        batch.category == AutoCleanCategory.Memes
-                    ) {
-                        Text(
-                            "Suggestion only: review carefully before deleting.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                        )
-                    }
-                    AutoCleanPreviewRow(batch.photos)
-                }
-            }
+            AutoCleanCategoryCard(
+                batch = batch,
+                selected = selected,
+                onToggleCategory = onToggleCategory,
+                onUnlockClick = onUnlockClick,
+            )
         }
         Spacer(Modifier.weight(1f))
         Button(
@@ -1542,6 +1556,81 @@ fun AutoCleanSummaryScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(if (selectedCount > 0) "Review $selectedCount items (${formatBytes(selectedBytes)})" else "Nothing selected")
+        }
+    }
+}
+
+@Composable
+fun AutoCleanCategoryCard(
+    batch: AutoCleanBatch,
+    selected: Boolean,
+    onToggleCategory: (AutoCleanCategory) -> Unit,
+    onUnlockClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .let {
+                if (batch.isLocked) {
+                    it.clickable(onClick = onUnlockClick)
+                } else {
+                    it.interactiveSurface()
+                }
+            },
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                batch.isLocked -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                selected -> MaterialTheme.colorScheme.surfaceContainerHighest
+                else -> MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(batch.title, style = MaterialTheme.typography.titleMedium)
+                if (batch.isLocked) {
+                    AssistChip(
+                        onClick = onUnlockClick,
+                        label = { Text("Premium") },
+                    )
+                } else {
+                    AssistChip(
+                        onClick = { onToggleCategory(batch.category) },
+                        label = { Text(if (selected) "Included" else "Excluded") },
+                    )
+                }
+            }
+            Text(batch.subtitle, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "${batch.totalCount} items | ${formatBytes(batch.bytes)}" +
+                    if (batch.groupCount > 0) " | ${batch.groupCount} groups" else "",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (batch.isLocked) {
+                Text(
+                    "Tap to unlock full cleanup for this category.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (
+                batch.category == AutoCleanCategory.SimilarShots ||
+                batch.category == AutoCleanCategory.LowQuality ||
+                batch.category == AutoCleanCategory.Selfies ||
+                batch.category == AutoCleanCategory.Documents ||
+                batch.category == AutoCleanCategory.Memes
+            ) {
+                Text(
+                    "Suggestion only: review carefully before deleting.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+            AutoCleanPreviewRow(batch.photos.take(4))
         }
     }
 }
@@ -1661,6 +1750,7 @@ fun SwipeScreen(
     total: Int,
     markedCount: Int,
     reclaimableBytes: Long,
+    isPremium: Boolean,
     onKeep: () -> Unit,
     onDelete: () -> Unit,
     onProtect: () -> Unit,
@@ -1726,7 +1816,7 @@ fun SwipeScreen(
                 Text(photo.name, style = MaterialTheme.typography.titleLarge)
                 Text(photo.relativePath ?: "Gallery", style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "${formatBytes(photo.sizeBytes)} | ${formatDimensions(photo)} | ${formatDate(photo.dateTaken)}",
+                    formatPhotoMetadata(photo, isPremium),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (duplicateGroup != null) {
@@ -1875,6 +1965,7 @@ fun SwipeScreen(
             photos = photos,
             initialIndex = selectedIndex,
             enableDecisionSwipe = true,
+            isPremium = isPremium,
             onKeep = {
                 previewIndex = (photoIndex + 1).takeIf { it < photos.size }
                 onKeep()
@@ -1983,6 +2074,7 @@ fun PhotoViewerOverlay(
     photos: List<PhotoItem>,
     initialIndex: Int,
     enableDecisionSwipe: Boolean,
+    isPremium: Boolean,
     onKeep: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     onUndo: (() -> Unit)? = null,
@@ -2248,7 +2340,7 @@ fun PhotoViewerOverlay(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        "${formatBytes(photo.sizeBytes)} | ${formatDimensions(photo)} | ${formatDate(photo.dateTaken)}",
+                        formatPhotoMetadata(photo, isPremium),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
@@ -2313,6 +2405,14 @@ private fun formatDimensions(photo: PhotoItem): String {
 private fun formatDate(dateTaken: Long): String {
     if (dateTaken <= 0L) return "Unknown date"
     return android.text.format.DateFormat.format("MMM d, yyyy", dateTaken).toString()
+}
+
+private fun formatPhotoMetadata(photo: PhotoItem, isPremium: Boolean): String {
+    return if (isPremium) {
+        "${formatBytes(photo.sizeBytes)} | ${formatDimensions(photo)} | ${formatDate(photo.dateTaken)}"
+    } else {
+        formatDate(photo.dateTaken)
+    }
 }
 
 private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { continuation ->
@@ -2486,6 +2586,7 @@ fun ReviewScreen(
             photos = photos,
             initialIndex = selectedIndex,
             enableDecisionSwipe = false,
+            isPremium = true,
             onDismiss = { previewIndex = null },
         )
     }

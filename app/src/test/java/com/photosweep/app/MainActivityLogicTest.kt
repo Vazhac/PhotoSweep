@@ -69,13 +69,62 @@ class MainActivityLogicTest {
 
         val categories = availableAutoCleanCategories(state)
         val selectedIds = selectedAutoCleanPhotos(state).map { it.id }
+        val batches = autoCleanBatches(state)
 
         assertTrue(categories.contains(AutoCleanCategory.Screenshots))
         assertTrue(categories.contains(AutoCleanCategory.LargeFiles))
-        assertTrue(categories.contains(AutoCleanCategory.Duplicates))
-        assertTrue(categories.contains(AutoCleanCategory.LowQuality))
-        assertTrue(categories.contains(AutoCleanCategory.Selfies))
+        assertFalse(categories.contains(AutoCleanCategory.Duplicates))
+        assertFalse(categories.contains(AutoCleanCategory.LowQuality))
+        assertFalse(categories.contains(AutoCleanCategory.Selfies))
+        assertTrue(batches.any { it.category == AutoCleanCategory.Duplicates && it.isLocked })
+        assertTrue(batches.any { it.category == AutoCleanCategory.LowQuality && it.isLocked })
+        assertTrue(batches.any { it.category == AutoCleanCategory.Selfies && it.isLocked })
         assertEquals(selectedIds.distinct().size, selectedIds.size)
+    }
+
+    @Test
+    fun sessionPhotos_hidesVideosForFreeUsers() {
+        val photo = testPhoto(id = 1, isVideo = false)
+        val video = testPhoto(id = 2, name = "clip.mp4", isVideo = true)
+
+        val freeState = PhotoSweepUiState(
+            allPhotos = listOf(photo, video),
+            isPremium = false,
+        )
+        val premiumState = freeState.copy(isPremium = true)
+
+        assertEquals(listOf(photo.id), sessionPhotos(freeState).map { it.id })
+        assertEquals(listOf(photo.id, video.id), sessionPhotos(premiumState).map { it.id })
+    }
+
+    @Test
+    fun autoCleanBatches_lockPremiumCategoriesButKeepRealCounts() {
+        val duplicates = listOf(
+            testPhoto(id = 1, name = "Trip.jpg"),
+            testPhoto(id = 2, name = "Trip copy.jpg", dateTaken = 2_000L),
+        )
+        val selfies = (3L..7L).map { id ->
+            testPhoto(id = id, name = "selfie_$id.jpg")
+        }
+        val state = PhotoSweepUiState(
+            allPhotos = duplicates + selfies,
+            smartScanSummary = SmartScanSummary(selfieIds = selfies.map { it.id }.toSet()),
+            isPremium = false,
+        )
+
+        val duplicateBatch = autoCleanBatches(state).first { it.category == AutoCleanCategory.Duplicates }
+        val selfieBatch = autoCleanBatches(state).first { it.category == AutoCleanCategory.Selfies }
+
+        assertTrue(duplicateBatch.isLocked)
+        assertEquals(duplicateBatch.allPhotos.size, duplicateBatch.totalCount)
+        assertTrue(duplicateBatch.photos.size <= 4)
+        assertTrue(duplicateBatch.subtitle.contains("Premium"))
+        assertTrue(duplicateBatch.subtitle.contains("${duplicateBatch.totalCount} found"))
+
+        assertTrue(selfieBatch.isLocked)
+        assertEquals(5, selfieBatch.totalCount)
+        assertEquals(4, selfieBatch.photos.size)
+        assertEquals(0, selectedAutoCleanPhotos(state).size)
     }
 
     @Test
@@ -120,6 +169,7 @@ class MainActivityLogicTest {
         width: Int = 1080,
         height: Int = 1920,
         relativePath: String? = "DCIM/Camera/",
+        isVideo: Boolean = false,
     ): PhotoItem {
         return PhotoItem(
             id = id,
@@ -130,6 +180,7 @@ class MainActivityLogicTest {
             width = width,
             height = height,
             relativePath = relativePath,
+            isVideo = isVideo,
         )
     }
 }
