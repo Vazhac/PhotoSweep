@@ -94,7 +94,29 @@ class MainActivityLogicTest {
         val premiumState = freeState.copy(isPremium = true)
 
         assertEquals(listOf(photo.id), sessionPhotos(freeState).map { it.id })
-        assertEquals(listOf(photo.id, video.id), sessionPhotos(premiumState).map { it.id })
+        assertEquals(listOf(photo.id), sessionPhotos(premiumState).map { it.id })
+    }
+
+    @Test
+    fun videosFilter_isAvailableOnlyToPremiumUsers() {
+        assertFalse(availablePhotoFilters(isPremium = false).contains(PhotoFilter.Videos))
+        assertTrue(availablePhotoFilters(isPremium = true).contains(PhotoFilter.Videos))
+    }
+
+    @Test
+    fun videosFilter_returnsOnlyVideosForPremiumUsers() {
+        val photo = testPhoto(id = 1)
+        val firstVideo = testPhoto(id = 2, name = "first.mp4", isVideo = true)
+        val protectedVideo = testPhoto(id = 3, name = "protected.mp4", isVideo = true)
+        val state = PhotoSweepUiState(
+            allPhotos = listOf(photo, firstVideo, protectedVideo),
+            activeFilter = PhotoFilter.Videos,
+            protectedPhotoIds = setOf(protectedVideo.id),
+            isPremium = true,
+        )
+
+        assertEquals(listOf(firstVideo.id), sessionPhotos(state).map { it.id })
+        assertTrue(sessionPhotos(state.copy(isPremium = false)).isEmpty())
     }
 
     @Test

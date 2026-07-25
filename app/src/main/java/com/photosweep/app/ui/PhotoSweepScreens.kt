@@ -153,6 +153,40 @@ private fun homeBackgroundBrush(): Brush = Brush.verticalGradient(
 )
 
 @Composable
+private fun MediaThumbnail(
+    photo: PhotoItem,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+) {
+    Box(modifier = modifier) {
+        AsyncImage(
+            model = photo.uri,
+            contentDescription = photo.name,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = contentScale,
+        )
+        if (photo.isVideo) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(48.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.Black.copy(alpha = 0.68f),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "▶",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        modifier = Modifier.padding(start = 3.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun PhotoSweepTheme(content: @Composable () -> Unit) {
     val colors = darkColorScheme(
         primary = Color(0xFFF4F4F5),
@@ -243,7 +277,7 @@ fun PhotoSweepApp(
                 uiState.loading -> LoadingScreen(modifier = Modifier.padding(padding))
                 !uiState.sessionStarted -> HomeScreen(
                     modifier = Modifier.padding(padding),
-                    totalPhotos = uiState.allPhotos.size,
+                    totalPhotos = uiState.allPhotos.count { !it.isVideo },
                     libraryPhotos = uiState.allPhotos,
                     matchingPhotos = currentSessionPhotos.size,
                     autoCleanCount = selectedAutoCleanPhotos.size,
@@ -254,6 +288,7 @@ fun PhotoSweepApp(
                     deletedCount = uiState.deletedCount,
                     reclaimableBytes = reclaimableBytes(uiState),
                     activeFilter = uiState.activeFilter,
+                    isPremium = uiState.isPremium,
                     onFilterSelected = viewModel::setFilter,
                     onStart = viewModel::startSession,
                     onAutoClean = viewModel::showAutoCleanSummary,
@@ -409,6 +444,7 @@ fun HomeScreen(
     deletedCount: Int,
     reclaimableBytes: Long,
     activeFilter: PhotoFilter,
+    isPremium: Boolean,
     onFilterSelected: (PhotoFilter) -> Unit,
     onStart: () -> Unit,
     onAutoClean: () -> Unit,
@@ -458,7 +494,7 @@ fun HomeScreen(
         StorageBreakdownBar(libraryPhotos)
         Text("Browse photos", style = MaterialTheme.typography.titleMedium)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(PhotoFilter.entries.toList()) { filter: PhotoFilter ->
+            items(availablePhotoFilters(isPremium)) { filter: PhotoFilter ->
                 AssistChip(
                     onClick = { onFilterSelected(filter) },
                     label = { Text(if (filter == activeFilter) "${filter.label} selected" else filter.label) },
@@ -765,9 +801,8 @@ fun AutoCleanPreviewRow(photos: List<PhotoItem>) {
                     .weight(1f)
                     .height(88.dp),
             ) {
-                AsyncImage(
-                    model = photo.uri,
-                    contentDescription = photo.name,
+                MediaThumbnail(
+                    photo = photo,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
@@ -947,9 +982,8 @@ fun SwipeScreen(
                         .fillMaxSize()
                         .background(feedbackColor)
                 )
-                AsyncImage(
-                    model = photo.uri,
-                    contentDescription = photo.name,
+                MediaThumbnail(
+                    photo = photo,
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInput(photo.id) {
@@ -1248,9 +1282,8 @@ fun PhotoViewerOverlay(
                     }
                 }
 
-            AsyncImage(
-                model = photo.uri,
-                contentDescription = photo.name,
+            MediaThumbnail(
+                photo = photo,
                 modifier = if (enableDecisionSwipe) {
                     imageModifier
                 } else {
@@ -1503,9 +1536,8 @@ fun ReviewScreen(
                             .animateContentSize()
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            AsyncImage(
-                                model = photo.uri,
-                                contentDescription = photo.name,
+                            MediaThumbnail(
+                                photo = photo,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(110.dp)

@@ -103,6 +103,7 @@ class PhotoSweepViewModel(private val repository: PhotoSweepRepository) : ViewMo
     }
 
     fun setFilter(filter: PhotoFilter) {
+        if (filter == PhotoFilter.Videos && !_uiState.value.isPremium) return
         commitState(normalizeState(_uiState.value.copy(
             activeFilter = filter,
             currentIndex = 0,

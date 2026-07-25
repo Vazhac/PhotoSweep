@@ -17,7 +17,7 @@ data class AutoCleanBatch(val category: AutoCleanCategory, val title: String, va
 data class SmartScanSummary(val selfieIds: Set<Long> = emptySet(), val documentIds: Set<Long> = emptySet(), val memeIds: Set<Long> = emptySet(), val lowQualityIds: Set<Long> = emptySet())
 internal data class SmartPhotoAnalysis(val isSelfie: Boolean, val isDocument: Boolean, val isMeme: Boolean, val isLowQuality: Boolean)
 internal data class CachedSmartPhotoAnalysis(val signature: String, val analysis: SmartPhotoAnalysis)
-enum class PhotoFilter(val label: String) { AllPhotos("All"), Duplicates("Duplicates"), LargeFiles("Large"), Screenshots("Screenshots"), OldPhotos("Old") }
+enum class PhotoFilter(val label: String) { AllPhotos("All"), Videos("Videos"), Duplicates("Duplicates"), LargeFiles("Large"), Screenshots("Screenshots"), OldPhotos("Old") }
 internal data class SwipeRecord(val photo: PhotoItem, val action: SwipeAction)
 internal enum class SwipeAction { KEEP, DELETE }
 data class PersistedSessionState(val activeFilter: PhotoFilter = PhotoFilter.AllPhotos, val currentIndex: Int = 0, val markedForDeletionIds: Set<Long> = emptySet(), val protectedPhotoIds: Set<Long> = emptySet(), val sessionStarted: Boolean = false, val screen: SessionScreen = SessionScreen.Home, val smartScanProcessed: Int = 0, val smartScanTotal: Int = 0, val smartScanSummary: SmartScanSummary = SmartScanSummary(), val smartScanSignature: String? = null, val deletedCount: Int = 0)

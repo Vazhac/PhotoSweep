@@ -109,7 +109,8 @@ private fun normalizedPhotoName(name: String): String {
 
 internal fun PhotoItem.matches(filter: PhotoFilter, nowMillis: Long = System.currentTimeMillis()): Boolean {
     return when (filter) {
-        PhotoFilter.AllPhotos -> true
+        PhotoFilter.AllPhotos -> !isVideo
+        PhotoFilter.Videos -> isVideo
         PhotoFilter.Duplicates -> false
         PhotoFilter.LargeFiles -> sizeBytes >= LargePhotoThresholdBytes
         PhotoFilter.Screenshots -> {
@@ -131,6 +132,12 @@ internal fun sessionPhotos(state: PhotoSweepUiState): List<PhotoItem> {
         duplicateGroups(availablePhotos).flatMap { it.photos }
     } else {
         availablePhotos.filter { photo -> photo.matches(state.activeFilter) }
+    }
+}
+
+internal fun availablePhotoFilters(isPremium: Boolean): List<PhotoFilter> {
+    return PhotoFilter.entries.filter { filter ->
+        filter != PhotoFilter.Videos || isPremium
     }
 }
 
