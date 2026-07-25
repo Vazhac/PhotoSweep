@@ -363,11 +363,14 @@ fun HomeScreen(
                 modifier = Modifier.padding(22.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text("Your library", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(totalPhotos.toString(), style = MaterialTheme.typography.displayMedium)
                 Text(
-                    if (totalPhotos == 1) "photo ready to review" else "photos ready to review",
-                    style = MaterialTheme.typography.titleMedium,
+                    "$totalPhotos ${if (totalPhotos == 1) "photo" else "photos"}",
+                    style = MaterialTheme.typography.displaySmall,
+                )
+                Text(
+                    "Ready to review",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Button(
                     onClick = onStart,
