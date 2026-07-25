@@ -2,7 +2,7 @@ package com.photosweep.app
 
 import android.graphics.Bitmap
 import com.google.mlkit.vision.face.Face
-private fun largestFaceRatio(
+internal fun largestFaceRatio(
     faces: List<com.google.mlkit.vision.face.Face>,
     bitmap: Bitmap,
 ): Float {
@@ -13,7 +13,7 @@ private fun largestFaceRatio(
     }
 }
 
-private fun hasCenteredPrimaryFace(
+internal fun hasCenteredPrimaryFace(
     faces: List<com.google.mlkit.vision.face.Face>,
     bitmap: Bitmap,
 ): Boolean {
@@ -24,7 +24,7 @@ private fun hasCenteredPrimaryFace(
     return centerX in 0.3f..0.7f && centerY in 0.25f..0.7f
 }
 
-private fun approximateSharpness(bitmap: Bitmap): Float {
+internal fun approximateSharpness(bitmap: Bitmap): Float {
     val scaled = Bitmap.createScaledBitmap(bitmap, 64, 64, true)
     var diffSum = 0f
     var comparisons = 0

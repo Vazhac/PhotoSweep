@@ -75,7 +75,7 @@ private fun possibleLowQualityPhotos(photos: List<PhotoItem>): List<PhotoItem> {
     return photos.filter(::isMetadataLowQuality).sortedBy { it.sizeBytes }
 }
 
-private fun isMetadataLowQuality(photo: PhotoItem): Boolean {
+internal fun isMetadataLowQuality(photo: PhotoItem): Boolean {
     val pixelCount = photo.width * photo.height
     val tinyResolution = pixelCount in 1 until LowQualityMaxPixels
     val tinyFile = photo.sizeBytes in 1 until LowQualityMaxBytes
@@ -83,7 +83,7 @@ private fun isMetadataLowQuality(photo: PhotoItem): Boolean {
     return (tinyResolution || tinyFile) && !screenshotLike
 }
 
-private fun isLikelySelfie(
+internal fun isLikelySelfie(
     photo: PhotoItem,
     faceCount: Int,
     faceRatio: Float,
@@ -95,7 +95,7 @@ private fun isLikelySelfie(
     return fewFaces && faceRatio >= SelfieMinFaceRatio && (hasCenteredFace || portraitish)
 }
 
-private fun PhotoItem.analysisSignature(): String {
+internal fun PhotoItem.analysisSignature(): String {
     return listOf(id, sizeBytes, dateTaken, width, height, relativePath.orEmpty()).joinToString("|")
 }
 
@@ -107,7 +107,7 @@ private fun normalizedPhotoName(name: String): String {
         .lowercase()
 }
 
-private fun PhotoItem.matches(filter: PhotoFilter, nowMillis: Long = System.currentTimeMillis()): Boolean {
+internal fun PhotoItem.matches(filter: PhotoFilter, nowMillis: Long = System.currentTimeMillis()): Boolean {
     return when (filter) {
         PhotoFilter.AllPhotos -> true
         PhotoFilter.Duplicates -> false
@@ -186,7 +186,7 @@ internal fun autoCleanBatches(state: PhotoSweepUiState): List<AutoCleanBatch> {
         batch(
             category = AutoCleanCategory.LargeFiles,
             title = "Large photo cleanup",
-            subtitle = "Targets photos above ${formatBytes(LargePhotoThresholdBytes)} first.",
+            subtitle = "Targets photos above 8 MB first.",
             photos = largeFiles,
             bytes = largeFiles.sumOf { it.sizeBytes },
         ),
