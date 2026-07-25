@@ -35,7 +35,7 @@ internal fun duplicateGroups(photos: List<PhotoItem>): List<DuplicateGroup> {
         .sortedByDescending { group -> group.photos.sumOf { it.sizeBytes } }
 }
 
-private fun duplicateGroupLookup(photos: List<PhotoItem>): Map<Long, DuplicateGroup> {
+internal fun duplicateGroupLookup(photos: List<PhotoItem>): Map<Long, DuplicateGroup> {
     return duplicateGroups(photos).flatMap { group ->
         group.photos.map { photo -> photo.id to group }
     }.toMap()
