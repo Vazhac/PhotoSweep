@@ -340,6 +340,7 @@ fun HomeScreen(
     onAutoClean: () -> Unit,
     onReviewMarked: (() -> Unit)?,
 ) {
+    var showOverview by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -391,6 +392,25 @@ fun HomeScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (totalPhotos > 0 || markedCount > 0 || deletedCount > 0) {
+            TextButton(
+                onClick = { showOverview = !showOverview },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (showOverview) "Hide library overview" else "Show library overview")
+            }
+            if (showOverview) {
+                StatsCard(
+                    totalPhotos = totalPhotos,
+                    matchingPhotos = matchingPhotos,
+                    duplicateGroupCount = duplicateGroupCount,
+                    markedCount = markedCount,
+                    protectedCount = protectedCount,
+                    deletedCount = deletedCount,
+                    reclaimableBytes = reclaimableBytes,
+                )
+            }
+        }
         if (autoCleanCount > 0) {
             Card(
                 modifier = Modifier.fillMaxWidth().interactiveSurface(),
