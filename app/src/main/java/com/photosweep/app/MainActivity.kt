@@ -54,7 +54,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -1207,7 +1206,6 @@ fun PhotoSweepApp(
     val pendingDeleteRequest by viewModel.pendingDeleteRequest.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
-    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.lastActionLabel) {
         uiState.lastActionLabel?.let { label ->
@@ -1276,7 +1274,7 @@ fun PhotoSweepApp(
                     reclaimableBytes = reclaimableBytes(uiState),
                     onRestore = viewModel::restorePhoto,
                     onRestoreAll = viewModel::restoreAllMarked,
-                    onDeleteSelected = { showDeleteConfirm = true },
+                    onDeleteSelected = { viewModel.requestDelete(context) },
                     onDone = viewModel::finishReview,
                     onResume = if (uiState.currentIndex < currentSessionPhotos.size) viewModel::resumeSwipe else null,
                 )
@@ -1302,26 +1300,6 @@ fun PhotoSweepApp(
         }
     }
 
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete selected photos?") },
-            text = { Text("This removes ${uiState.markedForDeletion.size} marked photos from the device gallery after Android confirmation.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteConfirm = false
-                    viewModel.requestDelete(context)
-                }) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
-                }
-            },
-        )
-    }
 }
 
 @Composable
@@ -1380,7 +1358,7 @@ fun HomeScreen(
             ) {
                 Text("Clean your library without losing control.", style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    "Swipe manually, run Auto Clean, and review everything before Android confirms deletion.",
+                    "Swipe manually or review cleanup suggestions before Android confirms deletion.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1388,18 +1366,30 @@ fun HomeScreen(
                     AssistChip(onClick = {}, label = { Text("$totalPhotos library") })
                     AssistChip(onClick = {}, label = { Text("$markedCount marked") })
                 }
+                Button(
+                    onClick = onStart,
+                    enabled = matchingPhotos > 0,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .interactiveSurface(),
+                ) {
+                    Text(if (matchingPhotos > 0) "Start reviewing $matchingPhotos photos" else "No photos in this filter")
+                }
             }
         }
-        StatsCard(
-            totalPhotos = totalPhotos,
-            matchingPhotos = matchingPhotos,
-            duplicateGroupCount = duplicateGroupCount,
-            markedCount = markedCount,
-            protectedCount = protectedCount,
-            deletedCount = deletedCount,
-            reclaimableBytes = reclaimableBytes,
-        )
-        Text("Browse by filter", style = MaterialTheme.typography.titleMedium)
+        if (totalPhotos > 0 || markedCount > 0 || deletedCount > 0) {
+            StatsCard(
+                totalPhotos = totalPhotos,
+                matchingPhotos = matchingPhotos,
+                duplicateGroupCount = duplicateGroupCount,
+                markedCount = markedCount,
+                protectedCount = protectedCount,
+                deletedCount = deletedCount,
+                reclaimableBytes = reclaimableBytes,
+            )
+        }
+        Text("Choose a filter", style = MaterialTheme.typography.titleMedium)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(PhotoFilter.entries.toList()) { filter: PhotoFilter ->
                 AssistChip(
@@ -1417,12 +1407,12 @@ fun HomeScreen(
             shape = RoundedCornerShape(26.dp),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Auto Clean Mode", style = MaterialTheme.typography.titleMedium)
+                Text("Cleanup suggestions", style = MaterialTheme.typography.titleMedium)
                 Text(
                     if (autoCleanCount > 0) {
-                        "One-tap cleanup can queue $autoCleanCount photos and free ${formatBytes(autoCleanBytes)}."
+                        "Review $autoCleanCount suggested photos and potentially free ${formatBytes(autoCleanBytes)}."
                     } else {
-                        "No high-confidence auto-clean candidates found right now."
+                        "No cleanup suggestions are ready right now."
                     },
                 )
                 Button(
@@ -1430,49 +1420,9 @@ fun HomeScreen(
                     enabled = autoCleanCount > 0,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (autoCleanCount > 0) "Run Auto Clean on $autoCleanCount items" else "Auto Clean unavailable")
+                    Text(if (autoCleanCount > 0) "Review suggestions" else "No suggestions yet")
                 }
             }
-        }
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .interactiveSurface()
-                .animateContentSize(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-            shape = RoundedCornerShape(26.dp),
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Current manual session", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    if (matchingPhotos > 0) {
-                        "$matchingPhotos photos match the ${activeFilter.label.lowercase()} filter."
-                    } else {
-                        "No photos match the ${activeFilter.label.lowercase()} filter."
-                    },
-                )
-                Text(
-                    when (activeFilter) {
-                        PhotoFilter.AllPhotos -> "Browse the full gallery."
-                        PhotoFilter.Duplicates -> "Shows probable duplicate groups based on metadata and filename patterns."
-                        PhotoFilter.LargeFiles -> "Prioritizes photos at least ${formatBytes(LargePhotoThresholdBytes)} each."
-                        PhotoFilter.Screenshots -> "Targets screenshots by filename and folder."
-                        PhotoFilter.OldPhotos -> "Shows photos older than about 6 months."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = onStart,
-            enabled = matchingPhotos > 0,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .interactiveSurface(),
-        ) {
-            Text(if (matchingPhotos > 0) "Start with $matchingPhotos photos" else "No photos in this filter")
         }
         if (onReviewMarked != null) {
             OutlinedButton(
@@ -1516,7 +1466,7 @@ fun AutoCleanSummaryScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-        Text("Auto Clean", style = MaterialTheme.typography.headlineMedium)
+        Text("Cleanup suggestions", style = MaterialTheme.typography.headlineMedium)
             TextButton(onClick = onBack) { Text("Close") }
         }
         Text("Scan results combine high-confidence cleanup batches with lower-confidence suggestions. Choose what to include before reviewing.")
@@ -1803,7 +1753,7 @@ fun SwipeScreen(
                 modifier = Modifier
                     .weight(1f)
                     .interactiveSurface(),
-            ) { Text("Marked $markedCount", maxLines = 1) }
+            ) { Text("$markedCount marked", maxLines = 1) }
         }
         Card(
             modifier = Modifier
@@ -1947,16 +1897,12 @@ fun SwipeScreen(
             }
         }
         Text(
-            "Swipe left to mark for deletion, swipe right to keep, or use the actions below.",
+            "Swipe left to delete · swipe right to keep.",
             style = MaterialTheme.typography.bodyMedium,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(onClick = onUndo, modifier = Modifier.weight(1f).interactiveSurface()) { Text("Undo") }
             OutlinedButton(onClick = onProtect, modifier = Modifier.weight(1f).interactiveSurface()) { Text("Protect") }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = onDelete, modifier = Modifier.weight(1f).interactiveSurface()) { Text("Mark delete") }
-            Button(onClick = onKeep, modifier = Modifier.weight(1f).interactiveSurface()) { Text("Keep") }
         }
     }
 
