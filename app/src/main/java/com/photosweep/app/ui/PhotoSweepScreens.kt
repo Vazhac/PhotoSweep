@@ -350,7 +350,7 @@ fun HomeScreen(
     ) {
         Text(
             "PhotoSweep",
-            fontSize = 34.sp,
+            fontSize = 26.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.5.sp,
         )
@@ -360,21 +360,21 @@ fun HomeScreen(
             shape = RoundedCornerShape(28.dp),
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text("Clean your library, one decision at a time.", style = MaterialTheme.typography.headlineSmall)
+                Text("Your library", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(totalPhotos.toString(), style = MaterialTheme.typography.displayMedium)
                 Text(
-                    if (totalPhotos > 0) "$totalPhotos photos ready to review. Swipe left to delete or right to keep."
-                    else "Add photos to your device, then come back here to start cleaning.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    if (totalPhotos == 1) "photo ready to review" else "photos ready to review",
+                    style = MaterialTheme.typography.titleMedium,
                 )
                 Button(
                     onClick = onStart,
                     enabled = matchingPhotos > 0,
                     modifier = Modifier.fillMaxWidth().height(52.dp).interactiveSurface(),
                 ) {
-                    Text(if (matchingPhotos > 0) "Start reviewing" else "No photos available")
+                    Text(if (matchingPhotos > 0) "Review $matchingPhotos photos" else "No photos available")
                 }
             }
         }
@@ -388,7 +388,7 @@ fun HomeScreen(
             }
         }
         Text(
-            "$matchingPhotos in this filter${if (protectedCount > 0) " Â· $protectedCount protected" else ""}",
+            "$matchingPhotos in this filter${if (protectedCount > 0) " / $protectedCount protected" else ""}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -431,7 +431,7 @@ fun HomeScreen(
                 onClick = onReviewMarked,
                 modifier = Modifier.fillMaxWidth().height(52.dp).interactiveSurface(),
             ) {
-                Text("Review $markedCount marked Â· ${formatBytes(reclaimableBytes)}")
+                Text("Review $markedCount marked Ã‚Â· ${formatBytes(reclaimableBytes)}")
             }
         }
         if (deletedCount > 0 || duplicateGroupCount > 0) {
