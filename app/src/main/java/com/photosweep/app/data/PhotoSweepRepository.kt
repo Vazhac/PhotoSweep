@@ -22,12 +22,22 @@ class PhotoSweepRepository(private val context: Context) {
     fun loadPhotos(includeVideos: Boolean): List<PhotoItem> {
         val photos = loadMediaItems(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, isVideo = false)
         if (includeVideos) {
-            photos += loadMediaItems(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, isVideo = true)
+            photos += loadMediaItems(
+                MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL),
+                isVideo = true,
+                selection = "${MediaStore.Files.FileColumns.MEDIA_TYPE}=?",
+                selectionArgs = arrayOf(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString()),
+            )
         }
         return photos.sortedByDescending { it.dateTaken }
     }
 
-    private fun loadMediaItems(uri: Uri, isVideo: Boolean): MutableList<PhotoItem> {
+    private fun loadMediaItems(
+        uri: Uri,
+        isVideo: Boolean,
+        selection: String? = null,
+        selectionArgs: Array<String>? = null,
+    ): MutableList<PhotoItem> {
         val photos = mutableListOf<PhotoItem>()
         val projection = arrayOf(
             MediaStore.MediaColumns._ID,
@@ -41,7 +51,7 @@ class PhotoSweepRepository(private val context: Context) {
         val sortOrder = "${MediaStore.MediaColumns.DATE_TAKEN} DESC"
 
         runCatching {
-            context.contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
+            context.contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val dateCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
