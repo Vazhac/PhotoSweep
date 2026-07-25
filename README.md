@@ -9,6 +9,7 @@ PhotoSweep is an Android photo-library cleanup app built with Kotlin and Jetpack
 - Lets users review a gallery one image at a time with swipe gestures: left marks a photo for deletion and right keeps it.
 - Supports Undo during a swipe session and allows individual photos to be protected from cleanup.
 - Provides filters for all photos, screenshots, large files, likely duplicates, and old photos.
+- Shows a compact color-coded storage breakdown for screenshots, videos, camera photos, downloads, and other library folders.
 - Groups likely duplicate files using normalized names, then shows the newest item first.
 - Offers a Cleanup Suggestions flow for screenshots, large files, duplicates, similar shots, possible low-quality photos, selfies, documents, and text-heavy images. It never deletes automatically; selected suggestions enter the normal review flow.
 - Runs its smart scan on-device with ML Kit face detection and text recognition, plus basic image-sharpness and metadata checks.
@@ -22,7 +23,7 @@ PhotoSweep is an Android photo-library cleanup app built with Kotlin and Jetpack
 PhotoSweep currently uses a simple in-memory premium flag for prototyping. There is no billing or durable entitlement yet.
 
 - **Free:** unlimited photo review, keep, delete, undo, protect, and basic filters for all photos, screenshots, large files, and old photos. Cleanup Suggestions is fully available for screenshots and large files.
-- **Premium prototype:** advanced Cleanup Suggestions for duplicates, similar shots, possible low-quality photos, selfies, documents, and text-heavy images. Full video support is planned but is not loaded yet.
+- **Premium prototype:** video loading, review, protection, and Android-confirmed deletion, plus advanced Cleanup Suggestions for duplicates, similar shots, possible low-quality photos, selfies, documents, and text-heavy images.
 - Locked Cleanup Suggestions remain visible with real counts and a small preview. They can be unlocked only by the temporary in-app prototype switch.
 
 ## Requirements
@@ -61,7 +62,7 @@ The current tests cover smart-scan signature stability, duplicate grouping, Auto
 
 ## Current limitations
 
-- The app currently reads images only; videos are represented by a premium check but are not loaded from `MediaStore` in the present repository implementation.
+- Video access is currently controlled by the temporary in-app premium prototype and requests Android's video-library permission when unlocked.
 - Smart cleanup uses heuristics and should be treated as a suggestion, not a guarantee. Users should review queued photos before confirming deletion.
 - The premium state is not persistent and has no billing integration.
 - The premium state is a temporary local prototype; Google Play Billing and persistent entitlement restoration are still required before release.
