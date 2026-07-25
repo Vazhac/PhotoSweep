@@ -200,3 +200,9 @@ private suspend fun <T> Task<T>.await(): T = kotlinx.coroutines.suspendCancellab
     addOnFailureListener { error -> continuation.resumeWithException(error) }
     addOnCanceledListener { continuation.cancel() }
 }
+
+private fun String?.toIdSet(): Set<Long> = this
+    ?.split(',')
+    ?.mapNotNull { it.toLongOrNull() }
+    ?.toSet()
+    ?: emptySet()
