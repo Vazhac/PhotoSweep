@@ -8,7 +8,7 @@ PhotoSweep is an Android photo-library cleanup app built with Kotlin and Jetpack
 - Loads and sorts images from `MediaStore` by capture date.
 - Lets users review a gallery one image at a time with swipe gestures: left marks a photo for deletion and right keeps it.
 - Supports Undo during a swipe session and allows individual photos to be protected from cleanup.
-- Provides filters for all photos, screenshots, large files, likely duplicates, and old photos.
+- Provides filters for all photos, screenshots, large files, likely duplicates, and old photos, plus a premium-only Videos filter.
 - Shows a compact color-coded storage breakdown for screenshots, videos, camera photos, downloads, and other library folders.
 - Groups likely duplicate files using normalized names, then shows the newest item first.
 - Offers a Cleanup Suggestions flow for screenshots, large files, duplicates, similar shots, possible low-quality photos, selfies, documents, and text-heavy images. It never deletes automatically; selected suggestions enter the normal review flow.
@@ -23,7 +23,7 @@ PhotoSweep is an Android photo-library cleanup app built with Kotlin and Jetpack
 PhotoSweep currently uses a simple in-memory premium flag for prototyping. There is no billing or durable entitlement yet.
 
 - **Free:** unlimited photo review, keep, delete, undo, protect, and basic filters for all photos, screenshots, large files, and old photos. Cleanup Suggestions is fully available for screenshots and large files.
-- **Premium prototype:** video loading, review, protection, and Android-confirmed deletion, plus advanced Cleanup Suggestions for duplicates, similar shots, possible low-quality photos, selfies, documents, and text-heavy images.
+- **Premium prototype:** a dedicated Videos filter with thumbnail play badges, swipe review, protection, undo, review queue, and Android-confirmed deletion, plus advanced Cleanup Suggestions for duplicates, similar shots, possible low-quality photos, selfies, documents, and text-heavy images. The All filter remains the normal photo-only library.
 - Locked Cleanup Suggestions remain visible with real counts and a small preview. They can be unlocked only by the temporary in-app prototype switch.
 
 ## Requirements
@@ -47,7 +47,7 @@ Run the local unit tests from Android Studio, or from a terminal with a configur
 ./gradlew testDebugUnitTest
 ```
 
-The current tests cover smart-scan signature stability, duplicate grouping, Auto Clean selection and premium locks, session normalization, and cleanup of missing scan IDs.
+The current tests cover smart-scan signature stability, duplicate grouping, Auto Clean selection and premium locks, premium-only video filter behavior, session normalization, and cleanup of missing scan IDs.
 
 ## Project structure
 
