@@ -281,7 +281,7 @@ internal fun SmartScanSummary.filterToExisting(photos: List<PhotoItem>): SmartSc
     )
 }
 
-private fun reclaimableBytes(state: PhotoSweepUiState): Long = state.markedForDeletion.sumOf { it.sizeBytes }
+internal fun reclaimableBytes(state: PhotoSweepUiState): Long = state.markedForDeletion.sumOf { it.sizeBytes }
 
 internal fun normalizeState(state: PhotoSweepUiState): PhotoSweepUiState {
     val currentPhotos = sessionPhotos(state)
