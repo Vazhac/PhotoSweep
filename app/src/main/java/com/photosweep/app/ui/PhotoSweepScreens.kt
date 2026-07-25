@@ -344,106 +344,85 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 20.dp, vertical = 24.dp)
-            .verticalScroll(rememberScrollState())
-            .animateContentSize(),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             "PhotoSweep",
-            fontSize = 38.sp,
+            fontSize = 34.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.5.sp,
         )
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .interactiveSurface()
-                .animateContentSize(),
+            modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
-            shape = RoundedCornerShape(30.dp),
+            shape = RoundedCornerShape(28.dp),
         ) {
             Column(
-                modifier = Modifier.padding(22.dp),
+                modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Clean your library without losing control.", style = MaterialTheme.typography.headlineSmall)
+                Text("Clean your library, one decision at a time.", style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    "Swipe manually or review cleanup suggestions before Android confirms deletion.",
-                    style = MaterialTheme.typography.bodyLarge,
+                    if (totalPhotos > 0) "$totalPhotos photos ready to review. Swipe left to delete or right to keep."
+                    else "Add photos to your device, then come back here to start cleaning.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AssistChip(onClick = {}, label = { Text("$totalPhotos library") })
-                    AssistChip(onClick = {}, label = { Text("$markedCount marked") })
-                }
                 Button(
                     onClick = onStart,
                     enabled = matchingPhotos > 0,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .interactiveSurface(),
+                    modifier = Modifier.fillMaxWidth().height(52.dp).interactiveSurface(),
                 ) {
-                    Text(if (matchingPhotos > 0) "Start reviewing $matchingPhotos photos" else "No photos in this filter")
+                    Text(if (matchingPhotos > 0) "Start reviewing" else "No photos available")
                 }
             }
         }
-        if (totalPhotos > 0 || markedCount > 0 || deletedCount > 0) {
-            StatsCard(
-                totalPhotos = totalPhotos,
-                matchingPhotos = matchingPhotos,
-                duplicateGroupCount = duplicateGroupCount,
-                markedCount = markedCount,
-                protectedCount = protectedCount,
-                deletedCount = deletedCount,
-                reclaimableBytes = reclaimableBytes,
-            )
-        }
-        Text("Choose a filter", style = MaterialTheme.typography.titleMedium)
+        Text("Browse photos", style = MaterialTheme.typography.titleMedium)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(PhotoFilter.entries.toList()) { filter: PhotoFilter ->
                 AssistChip(
                     onClick = { onFilterSelected(filter) },
-                    label = { Text(if (filter == activeFilter) "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${filter.label}" else filter.label) },
+                    label = { Text(if (filter == activeFilter) "${filter.label} selected" else filter.label) },
                 )
             }
         }
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .interactiveSurface()
-                .animateContentSize(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-            shape = RoundedCornerShape(26.dp),
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Cleanup suggestions", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    if (autoCleanCount > 0) {
-                        "Review $autoCleanCount suggested photos and potentially free ${formatBytes(autoCleanBytes)}."
-                    } else {
-                        "No cleanup suggestions are ready right now."
-                    },
-                )
-                Button(
-                    onClick = onAutoClean,
-                    enabled = autoCleanCount > 0,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (autoCleanCount > 0) "Review suggestions" else "No suggestions yet")
+        Text(
+            "$matchingPhotos in this filter${if (protectedCount > 0) " Â· $protectedCount protected" else ""}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (autoCleanCount > 0) {
+            Card(
+                modifier = Modifier.fillMaxWidth().interactiveSurface(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                shape = RoundedCornerShape(24.dp),
+            ) {
+                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Cleanup suggestions", style = MaterialTheme.typography.titleMedium)
+                    Text("Review $autoCleanCount suggestions and potentially free ${formatBytes(autoCleanBytes)}.")
+                    Button(onClick = onAutoClean, modifier = Modifier.fillMaxWidth()) {
+                        Text("Review suggestions")
+                    }
                 }
             }
         }
-        if (onReviewMarked != null) {
+        if (onReviewMarked != null && markedCount > 0) {
             OutlinedButton(
                 onClick = onReviewMarked,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .interactiveSurface(),
+                modifier = Modifier.fillMaxWidth().height(52.dp).interactiveSurface(),
             ) {
-                Text("Review $markedCount marked photos")
+                Text("Review $markedCount marked Â· ${formatBytes(reclaimableBytes)}")
             }
+        }
+        if (deletedCount > 0 || duplicateGroupCount > 0) {
+            Text(
+                listOfNotNull(
+                    deletedCount.takeIf { it > 0 }?.let { "$it deleted" },
+                    duplicateGroupCount.takeIf { it > 0 }?.let { "$it duplicate groups found" },
+                ).joinToString(" / "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -907,7 +886,7 @@ fun SwipeScreen(
             }
         }
         Text(
-            "Swipe left to delete ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· swipe right to keep.",
+            "Swipe left to delete, swipe right to keep.",
             style = MaterialTheme.typography.bodyMedium,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
