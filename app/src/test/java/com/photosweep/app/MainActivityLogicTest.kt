@@ -161,6 +161,94 @@ class MainActivityLogicTest {
         assertFalse(filtered.lowQualityIds.contains(4L))
     }
 
+    @Test
+    fun sessionPhotos_excludesProtectedPhotosAndUsesDuplicateGroups() {
+        val newest = testPhoto(id = 1, name = "Trip copy.jpg", dateTaken = 2_000L)
+        val oldest = testPhoto(id = 2, name = "Trip.jpg", dateTaken = 1_000L)
+        val other = testPhoto(id = 3, name = "Other.jpg")
+
+        val state = PhotoSweepUiState(
+            allPhotos = listOf(newest, oldest, other),
+            activeFilter = PhotoFilter.Duplicates,
+            protectedPhotoIds = setOf(oldest.id),
+        )
+
+        assertTrue(sessionPhotos(state).isEmpty())
+        assertEquals(
+            listOf(newest.id, oldest.id),
+            sessionPhotos(state.copy(protectedPhotoIds = emptySet())).map { it.id },
+        )
+    }
+
+    @Test
+    fun autoCleanBatches_unlockPremiumCategoriesAndIncludeTheirPhotos() {
+        val first = testPhoto(id = 1, name = "Trip.jpg")
+        val second = testPhoto(id = 2, name = "Trip copy.jpg", dateTaken = 2_000L)
+        val state = PhotoSweepUiState(
+            allPhotos = listOf(first, second),
+            autoCleanSelection = setOf(AutoCleanCategory.Duplicates),
+            isPremium = true,
+        )
+
+        val duplicates = autoCleanBatches(state).first { it.category == AutoCleanCategory.Duplicates }
+
+        assertFalse(duplicates.isLocked)
+        assertEquals(2, duplicates.photos.size)
+        assertEquals(setOf(first.id, second.id), selectedAutoCleanPhotos(state).map { it.id }.toSet())
+    }
+
+    @Test
+    fun autoCleanBatches_hidesVideosForFreeUsers() {
+        val screenshot = testPhoto(id = 1, name = "Screenshot_1.png")
+        val video = testPhoto(id = 2, name = "Screenshot_2.mp4", isVideo = true)
+
+        val freeScreenshots = autoCleanBatches(
+            PhotoSweepUiState(allPhotos = listOf(screenshot, video)),
+        ).first { it.category == AutoCleanCategory.Screenshots }
+        val premiumScreenshots = autoCleanBatches(
+            PhotoSweepUiState(allPhotos = listOf(screenshot, video), isPremium = true),
+        ).first { it.category == AutoCleanCategory.Screenshots }
+
+        assertEquals(listOf(screenshot.id), freeScreenshots.allPhotos.map { it.id })
+        assertEquals(setOf(screenshot.id, video.id), premiumScreenshots.allPhotos.map { it.id }.toSet())
+    }
+
+    @Test
+    fun normalizeState_returnsHomeWhenNoSessionIsActive() {
+        val normalized = normalizeState(
+            PhotoSweepUiState(
+                allPhotos = listOf(testPhoto(id = 1)),
+                sessionStarted = false,
+                screen = SessionScreen.Swipe,
+                currentIndex = 1,
+            ),
+        )
+
+        assertEquals(SessionScreen.Home, normalized.screen)
+        assertEquals(1, normalized.currentIndex)
+    }
+
+    @Test
+    fun reclaimableBytes_sumsOnlyMarkedPhotos() {
+        val first = testPhoto(id = 1, sizeBytes = 2_000L)
+        val second = testPhoto(id = 2, sizeBytes = 3_500L)
+
+        assertEquals(
+            5_500L,
+            reclaimableBytes(PhotoSweepUiState(markedForDeletion = listOf(first, second))),
+        )
+    }
+
+    @Test
+    fun smartScanSignature_changesWhenProtectedPhotosChange() {
+        val photo = testPhoto(id = 1)
+
+        assertFalse(
+            smartScanSignature(listOf(photo), emptySet()) ==
+                smartScanSignature(listOf(photo), setOf(photo.id)),
+        )
+    }
+
     private fun testPhoto(
         id: Long,
         name: String = "IMG_$id.jpg",
