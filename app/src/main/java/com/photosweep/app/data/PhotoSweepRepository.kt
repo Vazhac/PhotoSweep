@@ -198,4 +198,5 @@ class PhotoSweepRepository(private val context: Context) {
 private suspend fun <T> Task<T>.await(): T = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
     addOnSuccessListener { result -> continuation.resume(result) }
     addOnFailureListener { error -> continuation.resumeWithException(error) }
+    addOnCanceledListener { continuation.cancel() }
 }
