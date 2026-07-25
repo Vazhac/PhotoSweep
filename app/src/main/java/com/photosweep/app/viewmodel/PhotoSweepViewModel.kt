@@ -49,7 +49,7 @@ class PhotoSweepViewModel(private val repository: PhotoSweepRepository) : ViewMo
         viewModelScope.launch(Dispatchers.IO) {
             val previousState = _uiState.value
             _uiState.value = previousState.copy(loading = true)
-            val photos = repository.loadPhotos()
+            val photos = repository.loadPhotos(includeVideos = Premium.isPremium())
             val markedIds = if (previousState.markedForDeletion.isNotEmpty() || previousState.allPhotos.isNotEmpty()) {
                 previousState.markedForDeletion.mapTo(mutableSetOf()) { it.id }
             } else {
@@ -121,7 +121,9 @@ class PhotoSweepViewModel(private val repository: PhotoSweepRepository) : ViewMo
         val state = _uiState.value
         if (state.smartScanInProgress || state.allPhotos.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
-            val scanPhotos = _uiState.value.allPhotos.filter { it.id !in _uiState.value.protectedPhotoIds }
+            val scanPhotos = _uiState.value.allPhotos.filter {
+                it.id !in _uiState.value.protectedPhotoIds && !it.isVideo
+            }
             val currentSignature = smartScanSignature(_uiState.value.allPhotos, _uiState.value.protectedPhotoIds)
             if (_uiState.value.smartScanSignature == currentSignature && _uiState.value.smartScanProcessed > 0) {
                 return@launch

@@ -185,17 +185,20 @@ fun PhotoSweepTheme(content: @Composable () -> Unit) {
 fun PhotoSweepApp(
     viewModel: PhotoSweepViewModel,
     onLaunchDeleteRequest: (android.app.PendingIntent) -> Unit,
+    onRequestVideoAccess: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val currentSessionPhotos = remember(
         uiState.allPhotos,
         uiState.protectedPhotoIds,
         uiState.activeFilter,
+        uiState.isPremium,
     ) { sessionPhotos(uiState) }
     val autoCleanBatches = remember(
         uiState.allPhotos,
         uiState.protectedPhotoIds,
         uiState.smartScanSummary,
+        uiState.isPremium,
     ) { autoCleanBatches(uiState) }
     val selectedAutoCleanBatches = remember(
         autoCleanBatches,
@@ -241,6 +244,7 @@ fun PhotoSweepApp(
                 !uiState.sessionStarted -> HomeScreen(
                     modifier = Modifier.padding(padding),
                     totalPhotos = uiState.allPhotos.size,
+                    libraryPhotos = uiState.allPhotos,
                     matchingPhotos = currentSessionPhotos.size,
                     autoCleanCount = selectedAutoCleanPhotos.size,
                     autoCleanBytes = selectedAutoCleanPhotos.sumOf { it.sizeBytes },
@@ -268,7 +272,10 @@ fun PhotoSweepApp(
                     onContinue = viewModel::showAutoCleanReview,
                     onBack = viewModel::exitAutoClean,
                     onStartSmartScan = viewModel::startSmartScan,
-                    onUnlockClick = viewModel::unlockPremium,
+                    onUnlockClick = {
+                        viewModel.unlockPremium()
+                        onRequestVideoAccess()
+                    },
                 )
                 uiState.screen == SessionScreen.AutoCleanReview -> AutoCleanReviewScreen(
                     modifier = Modifier.padding(padding),
@@ -323,9 +330,76 @@ fun LoadingScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun StorageBreakdownBar(photos: List<PhotoItem>) {
+    val segments = libraryStorageBreakdown(photos)
+    val totalBytes = segments.sumOf { it.bytes }
+    if (totalBytes <= 0L) return
+
+    val colors = mapOf(
+        "Screenshots" to Color(0xFF8B5CF6),
+        "Videos" to Color(0xFFEF4444),
+        "Camera" to Color(0xFF22C55E),
+        "Downloads" to Color(0xFFF59E0B),
+        "Other" to Color(0xFF64748B),
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Library storage", style = MaterialTheme.typography.titleMedium)
+                Text(formatBytes(totalBytes), style = MaterialTheme.typography.titleMedium)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp),
+            ) {
+                segments.forEach { segment ->
+                    Box(
+                        modifier = Modifier
+                            .weight(segment.bytes.toFloat())
+                            .fillMaxSize()
+                            .background(colors.getValue(segment.label)),
+                    )
+                }
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(segments) { segment ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(colors.getValue(segment.label), RoundedCornerShape(4.dp)),
+                        )
+                        Text(
+                            "${segment.label} ${formatBytes(segment.bytes)}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
     totalPhotos: Int,
+    libraryPhotos: List<PhotoItem>,
     matchingPhotos: Int,
     autoCleanCount: Int,
     autoCleanBytes: Long,
@@ -381,6 +455,7 @@ fun HomeScreen(
                 }
             }
         }
+        StorageBreakdownBar(libraryPhotos)
         Text("Browse photos", style = MaterialTheme.typography.titleMedium)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(PhotoFilter.entries.toList()) { filter: PhotoFilter ->

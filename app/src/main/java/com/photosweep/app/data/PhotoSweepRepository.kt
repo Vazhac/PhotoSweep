@@ -19,53 +19,51 @@ class PhotoSweepRepository(private val context: Context) {
         context.getSharedPreferences("photosweep_session", Context.MODE_PRIVATE)
     }
 
-    fun loadPhotos(): List<PhotoItem> {
+    fun loadPhotos(includeVideos: Boolean): List<PhotoItem> {
+        val photos = loadMediaItems(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, isVideo = false)
+        if (includeVideos) {
+            photos += loadMediaItems(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, isVideo = true)
+        }
+        return photos.sortedByDescending { it.dateTaken }
+    }
+
+    private fun loadMediaItems(uri: Uri, isVideo: Boolean): MutableList<PhotoItem> {
         val photos = mutableListOf<PhotoItem>()
         val projection = arrayOf(
-            MediaStore.Images.Media._ID,
-            MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.DATE_TAKEN,
-            MediaStore.Images.Media.SIZE,
-            MediaStore.Images.Media.WIDTH,
-            MediaStore.Images.Media.HEIGHT,
-            MediaStore.Images.Media.RELATIVE_PATH,
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.DATE_TAKEN,
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.MediaColumns.WIDTH,
+            MediaStore.MediaColumns.HEIGHT,
+            MediaStore.MediaColumns.RELATIVE_PATH,
         )
-        val sortOrder = "${MediaStore.Images.Media.DATE_TAKEN} DESC"
+        val sortOrder = "${MediaStore.MediaColumns.DATE_TAKEN} DESC"
 
-        context.contentResolver.query(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            null,
-            null,
-            sortOrder,
-        )?.use { cursor ->
-            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-            val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-            val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
-            val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
-            val widthCol = cursor.getColumnIndex(MediaStore.Images.Media.WIDTH)
-            val heightCol = cursor.getColumnIndex(MediaStore.Images.Media.HEIGHT)
-            val relativePathCol = cursor.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
+        runCatching {
+            context.contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                val dateCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                val widthCol = cursor.getColumnIndex(MediaStore.MediaColumns.WIDTH)
+                val heightCol = cursor.getColumnIndex(MediaStore.MediaColumns.HEIGHT)
+                val relativePathCol = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
 
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idCol)
-                val name = cursor.getString(nameCol) ?: "Photo"
-                val dateTaken = cursor.getLong(dateCol)
-                val sizeBytes = cursor.getLong(sizeCol)
-                val width = if (widthCol >= 0) cursor.getInt(widthCol) else 0
-                val height = if (heightCol >= 0) cursor.getInt(heightCol) else 0
-                val relativePath = if (relativePathCol >= 0) cursor.getString(relativePathCol) else null
-                val uri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
-                photos += PhotoItem(
-                    id = id,
-                    uri = uri,
-                    name = name,
-                    dateTaken = dateTaken,
-                    sizeBytes = sizeBytes,
-                    width = width,
-                    height = height,
-                    relativePath = relativePath,
-                )
+                while (cursor.moveToNext()) {
+                    val mediaStoreId = cursor.getLong(idCol)
+                    photos += PhotoItem(
+                        id = if (isVideo) -mediaStoreId else mediaStoreId,
+                        uri = Uri.withAppendedPath(uri, mediaStoreId.toString()),
+                        name = cursor.getString(nameCol) ?: if (isVideo) "Video" else "Photo",
+                        dateTaken = cursor.getLong(dateCol),
+                        sizeBytes = cursor.getLong(sizeCol),
+                        width = if (widthCol >= 0) cursor.getInt(widthCol) else 0,
+                        height = if (heightCol >= 0) cursor.getInt(heightCol) else 0,
+                        relativePath = if (relativePathCol >= 0) cursor.getString(relativePathCol) else null,
+                        isVideo = isVideo,
+                    )
+                }
             }
         }
         return photos

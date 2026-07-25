@@ -249,6 +249,28 @@ class MainActivityLogicTest {
         )
     }
 
+    @Test
+    fun libraryStorageBreakdown_usesExclusiveFolderGroups() {
+        val screenshots = testPhoto(
+            id = 1,
+            name = "Screenshot_1.png",
+            relativePath = "Pictures/Screenshots/",
+            sizeBytes = 100L,
+        )
+        val camera = testPhoto(id = 2, relativePath = "DCIM/Camera/", sizeBytes = 200L)
+        val download = testPhoto(id = 3, relativePath = "Download/", sizeBytes = 300L)
+        val video = testPhoto(id = 4, name = "clip.mp4", isVideo = true, sizeBytes = 400L)
+
+        val breakdown = libraryStorageBreakdown(listOf(screenshots, camera, download, video))
+            .associate { it.label to it.bytes }
+
+        assertEquals(100L, breakdown["Screenshots"])
+        assertEquals(200L, breakdown["Camera"])
+        assertEquals(300L, breakdown["Downloads"])
+        assertEquals(400L, breakdown["Videos"])
+        assertEquals(1_000L, breakdown.values.sum())
+    }
+
     private fun testPhoto(
         id: Long,
         name: String = "IMG_$id.jpg",
